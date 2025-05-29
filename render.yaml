@@ -11,13 +11,4 @@ services:
       - key: PORT
         value: 3000
       - key: FRONTEND_URL
-        value: https://stableconsultingengineers.github.io/SCEGDetails
-
-  - type: static
-    name: sceg-details-frontend
-    env: static
-    buildCommand: cd frontend && npm install
-    staticPublishPath: frontend
-    envVars:
-      - key: REACT_APP_API_URL
-        value: https://sceg-details-backend.onrender.com 
+        value: https://stableconsultingengineers.github.io/SCEGDetails 
