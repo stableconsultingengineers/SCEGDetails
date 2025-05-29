@@ -33,14 +33,14 @@ const upload = multer({ storage: storage });
 app.use('/uploads', express.static('uploads'));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bim-details', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
-    console.log('Connected to MongoDB');
-}).catch((error) => {
-    console.error('MongoDB connection error:', error);
-});
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bim-details')
+    .then(() => {
+        console.log('Connected to MongoDB');
+    })
+    .catch((error) => {
+        console.error('MongoDB connection error:', error);
+        process.exit(1); // Exit if we can't connect to the database
+    });
 
 // Model Schema
 const modelSchema = new mongoose.Schema({
