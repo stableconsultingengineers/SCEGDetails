@@ -11,4 +11,6 @@ services:
       - key: PORT
         value: 3000
       - key: FRONTEND_URL
-        value: https://stableconsultingengineers.github.io/SCEGDetails 
+        value: https://stableconsultingengineers.github.io/SCEGDetails
+    healthCheckPath: /health
+    autoDeploy: true 
