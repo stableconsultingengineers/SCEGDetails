@@ -38,16 +38,13 @@ const storage = multer.diskStorage({
 const upload = multer({ 
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
+        fileSize: 50 * 1024 * 1024 // 50MB limit
     },
     fileFilter: function (req, file, cb) {
         console.log('File received:', file.originalname, file.mimetype);
         cb(null, true);
     }
 });
-
-// Serve static files from the uploads directory
-app.use('/uploads', express.static('uploads'));
 
 // MongoDB connection with better error handling
 console.log('Attempting to connect to MongoDB...');
@@ -71,12 +68,118 @@ const modelSchema = new mongoose.Schema({
     materials: [String],
     specifications: [String],
     filePath: String,
-    uploadDate: { type: Date, default: Date.now }
+    uploadDate: { type: Date, default: Date.now },
+    fileSize: Number,
+    originalName: String
 });
 
 const Model = mongoose.model('Model', modelSchema);
 
-// Routes with extensive logging
+// ===== FILE HANDLING ROUTES (MUST BE BEFORE express.static) =====
+
+// Handle uploads with better error handling
+app.get('/uploads/:filename', (req, res) => {
+    const filePath = path.join(__dirname, 'uploads', req.params.filename);
+    
+    console.log('📁 File request:', req.params.filename);
+    console.log('📂 Looking for file at:', filePath);
+    
+    // Check if file exists
+    if (fs.existsSync(filePath)) {
+        console.log('✅ File found, serving...');
+        res.sendFile(filePath);
+    } else {
+        console.log('❌ File not found!');
+        console.log('📋 Available files:', fs.existsSync(path.join(__dirname, 'uploads')) ? 
+            fs.readdirSync(path.join(__dirname, 'uploads')) : 'uploads directory does not exist');
+        
+        res.status(404).json({ 
+            error: 'File not found',
+            message: 'The requested file is no longer available. Files are temporarily stored and may be removed during server maintenance.',
+            filename: req.params.filename,
+            suggestion: 'Please re-upload your model.'
+        });
+    }
+});
+
+// Debug route to check file system
+app.get('/debug/files', (req, res) => {
+    const uploadsPath = path.join(__dirname, 'uploads');
+    
+    try {
+        if (!fs.existsSync(uploadsPath)) {
+            return res.json({
+                error: 'uploads directory does not exist',
+                path: uploadsPath,
+                serverTime: new Date().toISOString(),
+                processUptime: process.uptime() + ' seconds'
+            });
+        }
+        
+        const files = fs.readdirSync(uploadsPath);
+        const fileDetails = files.map(file => {
+            const filePath = path.join(uploadsPath, file);
+            const stats = fs.statSync(filePath);
+            return {
+                name: file,
+                size: stats.size,
+                created: stats.birthtime,
+                modified: stats.mtime,
+                sizeFormatted: (stats.size / 1024 / 1024).toFixed(2) + 'MB'
+            };
+        });
+        
+        res.json({
+            uploadsPath: uploadsPath,
+            fileCount: files.length,
+            files: fileDetails,
+            totalSize: fileDetails.reduce((sum, file) => sum + file.size, 0),
+            totalSizeFormatted: (fileDetails.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(2) + 'MB',
+            serverTime: new Date().toISOString(),
+            processUptime: process.uptime() + ' seconds'
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            error: error.message,
+            stack: error.stack
+        });
+    }
+});
+
+// Debug route to check MongoDB models
+app.get('/debug/models', async (req, res) => {
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            return res.status(500).json({ error: 'Database not connected' });
+        }
+
+        const models = await Model.find().sort({ uploadDate: -1 });
+        
+        res.json({
+            count: models.length,
+            models: models.map(model => ({
+                id: model._id,
+                name: model.name,
+                category: model.category,
+                filePath: model.filePath,
+                uploadDate: model.uploadDate,
+                fileSize: model.fileSize,
+                originalName: model.originalName
+            })),
+            mongoConnection: {
+                state: mongoose.connection.readyState,
+                database: mongoose.connection.name
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ===== UPLOAD ROUTES =====
+
+// Basic upload route (for testing)
 app.post('/upload', upload.single('file'), (req, res) => {
     console.log('Basic upload route hit');
     if (!req.file) {
@@ -91,13 +194,13 @@ app.post('/upload', upload.single('file'), (req, res) => {
     });
 });
 
+// Main API upload route
 app.post('/api/upload', upload.single('model'), async (req, res) => {
     console.log('\n=== UPLOAD REQUEST START ===');
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
     console.log('File:', req.file);
     console.log('MongoDB connection state:', mongoose.connection.readyState);
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     
     try {
         if (!req.file) {
@@ -130,7 +233,9 @@ app.post('/api/upload', upload.single('model'), async (req, res) => {
             description: req.body.description || 'No description',
             materials: materials,
             specifications: specifications,
-            filePath: `/uploads/${req.file.filename}`
+            filePath: `/uploads/${req.file.filename}`,
+            fileSize: req.file.size,
+            originalName: req.file.originalname
         };
 
         console.log('Creating model with data:', modelData);
@@ -153,6 +258,9 @@ app.post('/api/upload', upload.single('model'), async (req, res) => {
     }
 });
 
+// ===== API ROUTES =====
+
+// Get all models
 app.get('/api/models', async (req, res) => {
     console.log('\n=== GET MODELS REQUEST ===');
     console.log('MongoDB connection state:', mongoose.connection.readyState);
@@ -163,27 +271,88 @@ app.get('/api/models', async (req, res) => {
             return res.status(500).json({ error: 'Database not connected' });
         }
 
-        const models = await Model.find();
+        const models = await Model.find().sort({ uploadDate: -1 });
         console.log('✅ Found models:', models.length);
-        res.json(models);
+        
+        // Add file existence check to each model
+        const modelsWithStatus = models.map(model => {
+            const filePath = path.join(__dirname, 'uploads', path.basename(model.filePath));
+            const fileExists = fs.existsSync(filePath);
+            
+            return {
+                ...model.toObject(),
+                fileExists: fileExists,
+                fileStatus: fileExists ? 'available' : 'missing'
+            };
+        });
+        
+        res.json(modelsWithStatus);
     } catch (error) {
         console.error('❌ Get models error:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Health check endpoint with more info
+// Get single model by ID
+app.get('/api/models/:id', async (req, res) => {
+    console.log('\n=== GET SINGLE MODEL REQUEST ===');
+    console.log('Model ID:', req.params.id);
+    
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            console.log('❌ MongoDB not connected');
+            return res.status(500).json({ error: 'Database not connected' });
+        }
+
+        const model = await Model.findById(req.params.id);
+        
+        if (!model) {
+            console.log('❌ Model not found');
+            return res.status(404).json({ error: 'Model not found' });
+        }
+
+        console.log('✅ Model found:', model.name);
+        
+        // Check if file exists
+        const filePath = path.join(__dirname, 'uploads', path.basename(model.filePath));
+        const fileExists = fs.existsSync(filePath);
+        
+        res.json({
+            ...model.toObject(),
+            fileExists: fileExists,
+            fileStatus: fileExists ? 'available' : 'missing'
+        });
+        
+    } catch (error) {
+        console.error('❌ Get model error:', error);
+        if (error.name === 'CastError') {
+            res.status(400).json({ error: 'Invalid model ID' });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+    }
+});
+
+// Health check endpoint
 app.get('/health', (req, res) => {
     const health = {
         status: 'ok',
         timestamp: new Date().toISOString(),
+        uptime: process.uptime() + ' seconds',
         mongodb: {
             connected: mongoose.connection.readyState === 1,
             state: mongoose.connection.readyState,
             database: mongoose.connection.name
         },
         uploads: {
-            directory: fs.existsSync(uploadsDir) ? 'exists' : 'missing'
+            directory: fs.existsSync(uploadsDir) ? 'exists' : 'missing',
+            fileCount: fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir).length : 0
+        },
+        memory: process.memoryUsage(),
+        env: {
+            node_version: process.version,
+            port: port,
+            mongodb_configured: !!process.env.MONGODB_URI
         }
     };
     console.log('Health check:', health);
@@ -196,8 +365,16 @@ app.use((error, req, res, next) => {
     res.status(500).json({ error: 'Internal server error', message: error.message });
 });
 
+// Handle 404
+app.use((req, res) => {
+    console.log('404 - Not found:', req.method, req.url);
+    res.status(404).json({ error: 'Not found', path: req.url });
+});
+
 // Start the server
 app.listen(port, () => {
     console.log(`🚀 Server is running on port ${port}`);
     console.log(`🔗 Health check: http://localhost:${port}/health`);
+    console.log(`🔍 Debug files: http://localhost:${port}/debug/files`);
+    console.log(`🔍 Debug models: http://localhost:${port}/debug/models`);
 });
