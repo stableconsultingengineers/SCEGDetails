@@ -413,11 +413,11 @@ body {
                     <option value="">Select Category</option>
                     <option value="structural">Structural</option>
                     <option value="civil">Civil</option>
-                    <option value="architectual">Architectural</option>
+                    <option value="architectural">Architectural</option>
                     <option value="custom">Custom</option>
                 </select>
                 <textarea placeholder="Description" rows="4" style="padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px;"></textarea>
-                <button type="submit" class="btn">Upload Model</button>
+                <button type="submit" style="background: #1e3a5f; color: white; border: none; padding: 0.8rem; border-radius: 6px; cursor: pointer; font-size: 1rem;">Upload Model</button>
             </form>
         </div>
     </div>
@@ -463,7 +463,30 @@ body {
     </div>
 </div>
 </div>
+
 <script>
+// ===== PRODUCTION CONFIGURATION =====
+const CONFIG = {
+    // 🔥 REPLACE THIS URL WITH YOUR ACTUAL RENDER URL! 🔥
+    API_BASE_URL: 'https://your-render-app.onrender.com', // Replace with YOUR Render URL
+    
+    // For development (comment out in production)
+    // API_BASE_URL: 'http://localhost:3000',
+};
+
+// Update CORS settings function
+function updateCorsForProduction() {
+    if (CONFIG.API_BASE_URL.includes('localhost')) {
+        console.log('🔧 Development mode - using localhost');
+    } else {
+        console.log('🚀 Production mode - using Render backend');
+    }
+}
+
+// Call the CORS update
+updateCorsForProduction();
+
+// ===== GLOBAL VARIABLES =====
 let scene, camera, renderer, model, controls;
 let isWireframe = false;
 let modelBoundingRadius = 2.5; // Default fallback
@@ -541,7 +564,7 @@ function shareDetail() {
     });
 }
 
-// ===== UPDATED NAVIGATION FUNCTIONS =====
+// ===== NAVIGATION FUNCTIONS =====
 function showHome() {
     hideAllPages();
     document.getElementById('home-page').classList.remove('hidden');
@@ -577,24 +600,43 @@ function showDetailById(modelId) {
     // Try to find model in cache first
     const cachedModel = modelsCache.find(m => (m.id || m._id) === modelId);
     if (cachedModel) {
+        console.log('📋 Found model in cache');
         showDetailDirect(cachedModel);
         return;
     }
     
     // If not in cache, try to fetch from API
-    fetch(`/api/models/${modelId}`)
-        .then(response => response.json())
+    console.log('🌐 Fetching model from API...');
+    fetch(`${CONFIG.API_BASE_URL}/api/models/${modelId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(model => {
-            if (model) {
+            if (model && !model.error) {
+                console.log('✅ Model loaded from API');
                 showDetailDirect(model);
             } else {
-                alert('Model not found');
+                console.warn('⚠️ Model not found');
+                alert('Model not found. It may have been deleted or moved.');
                 navigateTo('browse');
             }
         })
         .catch(error => {
-            console.error('Error loading model:', error);
-            alert('Error loading model');
+            console.error('❌ Error loading model:', error);
+            
+            let errorMessage = 'Error loading model';
+            if (error.message.includes('404')) {
+                errorMessage = 'Model not found. It may have been deleted.';
+            } else if (error.message.includes('500')) {
+                errorMessage = 'Server error. Please try again later.';
+            } else {
+                errorMessage = `Error loading model: ${error.message}`;
+            }
+            
+            alert(errorMessage);
             navigateTo('browse');
         });
 }
@@ -614,9 +656,9 @@ function showDetailDirect(model) {
         document.getElementById('detail-code').textContent = modelCode;
         document.getElementById('detail-title-text').textContent = modelName;
         document.getElementById('breadcrumb-detail').textContent = modelName;
-        document.getElementById('detail-description').textContent = model.description || '';
-        document.getElementById('detail-materials').innerHTML = (model.materials && model.materials.length) ? model.materials.join('<br>') : '';
-        document.getElementById('detail-specs').innerHTML = (model.specifications && model.specifications.length) ? model.specifications.join('<br>') : '';
+        document.getElementById('detail-description').textContent = model.description || 'No description available';
+        document.getElementById('detail-materials').innerHTML = (model.materials && model.materials.length) ? model.materials.join('<br>') : 'No materials specified';
+        document.getElementById('detail-specs').innerHTML = (model.specifications && model.specifications.length) ? model.specifications.join('<br>') : 'No specifications provided';
         
         // Update page title
         document.title = `${modelName} - BIM Details`;
@@ -650,14 +692,41 @@ function hideAllPages() {
     document.getElementById('browse-page').classList.add('hidden');
 }
 
+// ===== API FUNCTIONS FOR MONGODB BACKEND =====
 async function loadModels() {
     try {
-        const response = await fetch('/api/models');
-        const models = await response.json();
+        console.log('🔄 Loading models from:', `${CONFIG.API_BASE_URL}/api/models`);
+        
+        const response = await fetch(`${CONFIG.API_BASE_URL}/api/models`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // MongoDB backend returns {models: [...], pagination: {...}}
+        const models = data.models || data; // Handle both new and old format
+        console.log('✅ Models loaded:', models.length);
+        
         modelsCache = models; // Cache the models for routing
         
         const grid = document.querySelector('#browse-page .details-grid');
         grid.innerHTML = '';
+        
+        if (models.length === 0) {
+            grid.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #666;">
+                    <h3>📦 No models uploaded yet</h3>
+                    <p>Be the first to upload a 3D model to the library!</p>
+                    <button onclick="navigateTo('upload')" style="background: #1e3a5f; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; margin-top: 1rem;">
+                        📤 Upload Your First Model
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
         models.forEach(model => {
             const modelId = model.id || model._id;
             const card = document.createElement('div');
@@ -665,18 +734,50 @@ async function loadModels() {
             card.innerHTML = `
                 <div class="card-preview">🏗️</div>
                 <h3>${model.name}</h3>
-                <p>${model.description}</p>
-                <small>${model.category} • Uploaded ${new Date(model.uploadDate).toLocaleDateString()}</small>
+                <p>${model.description || 'No description available'}</p>
+                <small>
+                    <strong>${model.category}</strong> • 
+                    Uploaded ${new Date(model.uploadDate).toLocaleDateString()}
+                    ${model.fileSize ? ` • ${(model.fileSize / 1024 / 1024).toFixed(1)}MB` : ''}
+                </small>
             `;
             card.onclick = () => navigateTo(`detail/${modelId}`);
             grid.appendChild(card);
         });
+        
+        // Show pagination info if available
+        if (data.pagination) {
+            const paginationInfo = document.createElement('div');
+            paginationInfo.style.cssText = 'grid-column: 1/-1; text-align: center; padding: 1rem; color: #666; font-size: 0.9rem;';
+            paginationInfo.innerHTML = `
+                Showing ${models.length} of ${data.pagination.total} models
+                ${data.pagination.pages > 1 ? ` (Page ${data.pagination.page} of ${data.pagination.pages})` : ''}
+            `;
+            grid.appendChild(paginationInfo);
+        }
+        
     } catch (error) {
-        console.error('Error loading models:', error);
+        console.error('❌ Error loading models:', error);
+        const grid = document.querySelector('#browse-page .details-grid');
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #dc3545;">
+                <h3>⚠️ Unable to load models</h3>
+                <p>Backend may be starting up (this can take 30-60 seconds on first load)</p>
+                <button onclick="loadModels()" style="background: #dc3545; color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 6px; cursor: pointer; margin-top: 1rem;">🔄 Retry</button>
+                <details style="margin-top: 1rem; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+                    <summary style="cursor: pointer; color: #666;">🔧 Technical Details</summary>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666; background: #f8f9fa; padding: 1rem; border-radius: 4px;">
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Backend URL:</strong> ${CONFIG.API_BASE_URL}<br>
+                        <strong>Endpoint:</strong> /api/models
+                    </p>
+                </details>
+            </div>
+        `;
     }
 }
 
-// ===== 3D VIEWER FUNCTIONS (unchanged) =====
+// ===== 3D VIEWER FUNCTIONS =====
 function init3DViewer() {
     const canvas = document.getElementById('viewer-canvas');
     const container = document.querySelector('.model-viewer');
@@ -872,6 +973,230 @@ function toggleFullscreen() {
     }
 }
 
+// ===== UPLOAD FUNCTIONALITY =====
+document.addEventListener('DOMContentLoaded', () => {
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadForm = document.getElementById('model-form');
+    const uploadProgress = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const uploadStatus = document.getElementById('upload-status');
+    const uploadFormSection = document.getElementById('upload-form');
+    const filePreview = document.getElementById('file-preview');
+    const fileName = document.getElementById('file-name');
+    const removeFileBtn = document.getElementById('remove-file');
+    let selectedFile = null;
+
+    // Show file dialog on click
+    uploadZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // Drag and drop events
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    // Remove file button click
+    removeFileBtn.addEventListener('click', () => {
+        clearSelectedFile();
+    });
+
+    function handleFiles(files) {
+        if (!files.length) return;
+        
+        const file = files[0];
+        const validExtensions = ['glb', 'obj', 'fbx', 'gltf'];
+        const extension = file.name.split('.').pop().toLowerCase();
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        
+        console.log('📁 Selected file:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2) + 'MB');
+        
+        if (!validExtensions.includes(extension)) {
+            alert('Invalid file type. Please use GLB, GLTF, OBJ, or FBX files.');
+            return;
+        }
+        
+        if (file.size > maxSize) {
+            alert('File too large. Maximum size is 50MB.');
+            return;
+        }
+        
+        selectedFile = file;
+        
+        // Show file preview with name and remove button
+        fileName.textContent = file.name;
+        filePreview.classList.remove('hidden');
+        
+        // Show form
+        uploadFormSection.classList.remove('hidden');
+        
+        // Show progress bar as ready
+        uploadProgress.classList.remove('hidden');
+        progressFill.style.width = '0%';
+        uploadStatus.textContent = 'File selected. Fill in the details below and click upload.';
+        
+        console.log('✅ File ready for upload');
+    }
+
+    function clearSelectedFile() {
+        selectedFile = null;
+        fileInput.value = ''; // Clear the file input
+        
+        // Hide file preview
+        filePreview.classList.add('hidden');
+        fileName.textContent = '';
+        
+        // Hide upload form and progress
+        uploadFormSection.classList.add('hidden');
+        uploadProgress.classList.add('hidden');
+        
+        // Reset form
+        uploadForm.reset();
+        
+        console.log('🗑️ File selection cleared');
+    }
+
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!selectedFile) {
+            alert('Please select a file first.');
+            return;
+        }
+
+        console.log('🚀 Starting upload process...');
+        
+        // Show progress
+        uploadProgress.classList.remove('hidden');
+        progressFill.style.width = '0%';
+        uploadStatus.textContent = 'Preparing upload...';
+
+        const formData = new FormData();
+        const inputs = uploadForm.querySelectorAll('input, select, textarea');
+        
+        // Get form values
+        const detailCode = inputs[0].value.trim();
+        const title = inputs[1].value.trim();
+        const category = inputs[2].value;
+        const description = inputs[3].value.trim();
+        
+        // Validate required fields
+        if (!detailCode || !title || !category) {
+            alert('Please fill in all required fields (Detail Code, Title, Category)');
+            uploadStatus.textContent = 'Please complete the form';
+            return;
+        }
+        
+        // Add form data
+        formData.append('model', selectedFile);
+        formData.append('code', detailCode);
+        formData.append('name', title);
+        formData.append('category', category);
+        formData.append('description', description || 'No description provided');
+        formData.append('materials', 'Standard materials'); // Default
+        formData.append('specifications', 'Standard specifications'); // Default
+
+        console.log('📋 Form data prepared:', {
+            code: detailCode,
+            name: title,
+            category: category,
+            description: description,
+            fileName: selectedFile.name
+        });
+
+        const xhr = new XMLHttpRequest();
+        
+        // Use CONFIG.API_BASE_URL for the upload endpoint
+        const uploadUrl = `${CONFIG.API_BASE_URL}/api/upload`;
+        console.log('🌐 Upload URL:', uploadUrl);
+        
+        xhr.open('POST', uploadUrl, true);
+
+        // Progress tracking
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressFill.style.width = `${percentComplete}%`;
+                uploadStatus.textContent = `Uploading... ${percentComplete}%`;
+                console.log(`📊 Upload progress: ${percentComplete}%`);
+            }
+        };
+
+        xhr.onload = function() {
+            console.log('📡 Upload response status:', xhr.status);
+            console.log('📡 Upload response:', xhr.responseText);
+            
+            if (xhr.status === 200) {
+                try {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.success) {
+                        progressFill.style.width = '100%';
+                        uploadStatus.textContent = 'Upload complete! 🎉';
+                        alert(`Model "${result.model.name}" uploaded successfully!\n\nYour model is now available in the Browse section.`);
+                        
+                        // Clear everything after successful upload
+                        clearSelectedFile();
+                        
+                        // Redirect to browse page after a short delay
+                        setTimeout(() => {
+                            console.log('🔄 Redirecting to browse page...');
+                            window.location.hash = 'browse';
+                        }, 2000);
+                    } else {
+                        throw new Error(result.error || 'Upload failed');
+                    }
+                } catch (parseError) {
+                    console.error('❌ Error parsing response:', parseError);
+                    uploadStatus.textContent = 'Upload failed - Invalid response';
+                    alert('Upload failed: Invalid server response');
+                }
+            } else {
+                console.error('❌ HTTP Error:', xhr.status, xhr.statusText);
+                uploadStatus.textContent = `Upload failed (${xhr.status})`;
+                alert(`Upload failed: ${xhr.status} ${xhr.statusText}\n\nPlease check if the backend is running and try again.`);
+            }
+        };
+
+        xhr.onerror = function() {
+            console.error('❌ Network error during upload');
+            uploadStatus.textContent = 'Network error';
+            alert('Network error during upload. Please check your connection and try again.\n\nBackend URL: ' + CONFIG.API_BASE_URL);
+        };
+
+        xhr.ontimeout = function() {
+            console.error('❌ Upload timeout');
+            uploadStatus.textContent = 'Upload timeout';
+            alert('Upload timed out. Please try again with a smaller file.');
+        };
+
+        // Set timeout (2 minutes for large files)
+        xhr.timeout = 120000;
+
+        // Start the upload
+        console.log('📤 Sending upload request...');
+        uploadStatus.textContent = 'Uploading to server...';
+        xhr.send(formData);
+    });
+
+    // Initialize routing when DOM is loaded
+    initRouting();
+});
+
 // Handle window resize with throttling for better performance
 let resizeTimeout;
 window.addEventListener('resize', () => {
@@ -887,12 +1212,6 @@ document.addEventListener('fullscreenchange', () => {
         resizeRenderer();
     }, 100);
 });
-
-// Initialize routing when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    initRouting();
-});
 </script>
-<script src="/assets/js/upload.js"></script>
 </body>
 </html>
