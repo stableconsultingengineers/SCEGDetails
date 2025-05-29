@@ -105,57 +105,40 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get the base URL from the current window location
         const baseUrl = window.location.origin;
         
-        formData.append('model', selectedFile);
+        formData.append('file', selectedFile);
         formData.append('name', inputs[1].value); // Title
         formData.append('category', inputs[2].value); // Category
         formData.append('description', inputs[3].value); // Description
         formData.append('materials', 'default'); // Default material
         formData.append('specifications', 'default'); // Default specification
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${baseUrl}/api/upload`, true);
+        try {
+            const response = await fetch(`${baseUrl}/api/upload`, {
+                method: 'POST',
+                body: formData
+            });
 
-        // Update progress bar during upload
-        xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-                const percentComplete = (e.loaded / e.total) * 100;
-                progressFill.style.width = `${percentComplete}%`;
-                uploadStatus.textContent = `Uploading... ${Math.round(percentComplete)}%`;
-                console.log(`Upload progress: ${percentComplete}%`); // Debug log
-            }
-        };
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                const result = JSON.parse(xhr.responseText);
-                if (result.success) {
-                    progressFill.style.width = '100%';
-                    uploadStatus.textContent = 'Upload complete!';
-                    alert('Model uploaded successfully! Your model is now available in the library.');
-                    
-                    // Clear everything after successful upload
-                    clearSelectedFile();
-                    
-                    // Redirect to browse page to see the new model
-                    setTimeout(() => {
-                        showBrowse(); // Use the existing function from main script
-                    }, 1500);
-                } else {
-                    uploadStatus.textContent = 'Upload failed.';
-                    alert('Upload failed: ' + result.error);
-                }
+            const result = await response.json();
+            
+            if (response.ok) {
+                progressFill.style.width = '100%';
+                uploadStatus.textContent = 'File uploaded successfully!';
+                alert('Model uploaded successfully! Your model is now available in the library.');
+                
+                // Clear everything after successful upload
+                clearSelectedFile();
+                
+                // Redirect to browse page to see the new model
+                setTimeout(() => {
+                    showBrowse(); // Use the existing function from main script
+                }, 1500);
             } else {
-                uploadStatus.textContent = 'Error uploading.';
-                alert('Error uploading file: ' + xhr.statusText);
+                uploadStatus.textContent = 'Upload failed: ' + result.message;
+                alert('Upload failed: ' + result.message);
             }
-        };
-
-        xhr.onerror = function() {
-            uploadStatus.textContent = 'Error uploading.';
-            alert('Error uploading file. Please try again.');
-        };
-
-        // Start the upload
-        xhr.send(formData);
+        } catch (error) {
+            uploadStatus.textContent = 'Error: ' + error.message;
+            alert('Error uploading file: ' + error.message);
+        }
     });
 });

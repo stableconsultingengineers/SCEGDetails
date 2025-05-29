@@ -16,28 +16,17 @@ app.use(express.static('public'));
 // Configure multer for file upload
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'public/assets/models')
+        cb(null, 'uploads/');
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname)
+        cb(null, Date.now() + '-' + file.originalname);
     }
 });
 
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB limit
-    },
-    fileFilter: function (req, file, cb) {
-        const allowedTypes = ['.glb', '.obj', '.fbx'];
-        const ext = path.extname(file.originalname).toLowerCase();
-        if (allowedTypes.includes(ext)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Invalid file type. Only GLB, OBJ, and FBX files are allowed.'));
-        }
-    }
-});
+const upload = multer({ storage: storage });
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static('uploads'));
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/bim-details', {
@@ -59,6 +48,17 @@ const modelSchema = new mongoose.Schema({
 const Model = mongoose.model('Model', modelSchema);
 
 // Routes
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).send('No file uploaded.');
+    }
+    res.json({
+        message: 'File uploaded successfully',
+        filename: req.file.filename,
+        path: `/uploads/${req.file.filename}`
+    });
+});
+
 app.post('/api/upload', upload.single('model'), async (req, res) => {
     try {
         if (!req.file) {
@@ -71,7 +71,7 @@ app.post('/api/upload', upload.single('model'), async (req, res) => {
             description: req.body.description,
             materials: req.body.materials.split(',').map(m => m.trim()),
             specifications: req.body.specifications.split(',').map(s => s.trim()),
-            filePath: `/assets/models/${req.file.filename}`
+            filePath: `/uploads/${req.file.filename}`
         });
 
         await model.save();
@@ -90,6 +90,7 @@ app.get('/api/models', async (req, res) => {
     }
 });
 
+// Start the server
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server is running on port ${port}`);
 }); 

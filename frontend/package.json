@@ -1,0 +1,12 @@
+{
+  "name": "sceg-details-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for SCEG Details application",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve ."
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+} 
