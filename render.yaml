@@ -3,10 +3,8 @@ services:
     name: sceg-details-backend
     env: node
     plan: free
-    buildCommand: |
-      cd backend
-      npm install --production
-    startCommand: cd backend && node server.js
+    buildCommand: npm install --production
+    startCommand: node server.js
     envVars:
       - key: MONGODB_URI
         sync: false
