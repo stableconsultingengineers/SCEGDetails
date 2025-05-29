@@ -11,8 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeFileBtn = document.getElementById('remove-file');
     let selectedFile = null;
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
-
     // Show file dialog on click
     uploadZone.addEventListener('click', () => {
         fileInput.click();
@@ -104,68 +102,60 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         const inputs = uploadForm.querySelectorAll('input, select, textarea');
         
-        formData.append('file', selectedFile);
+        // Get the base URL from the current window location
+        const baseUrl = window.location.origin;
+        
+        formData.append('model', selectedFile);
         formData.append('name', inputs[1].value); // Title
         formData.append('category', inputs[2].value); // Category
         formData.append('description', inputs[3].value); // Description
         formData.append('materials', 'default'); // Default material
         formData.append('specifications', 'default'); // Default specification
 
-        try {
-            const result = await uploadModel(formData);
-            
-            if (result.success) {
-                progressFill.style.width = '100%';
-                uploadStatus.textContent = 'File uploaded successfully!';
-                alert('Model uploaded successfully! Your model is now available in the library.');
-                
-                // Clear everything after successful upload
-                clearSelectedFile();
-                
-                // Redirect to browse page to see the new model
-                setTimeout(() => {
-                    showBrowse(); // Use the existing function from main script
-                }, 1500);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${baseUrl}/api/upload`, true);
+
+        // Update progress bar during upload
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                progressFill.style.width = `${percentComplete}%`;
+                uploadStatus.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+                console.log(`Upload progress: ${percentComplete}%`); // Debug log
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                if (result.success) {
+                    progressFill.style.width = '100%';
+                    uploadStatus.textContent = 'Upload complete!';
+                    alert('Model uploaded successfully! Your model is now available in the library.');
+                    
+                    // Clear everything after successful upload
+                    clearSelectedFile();
+                    
+                    // Redirect to browse page to see the new model
+                    setTimeout(() => {
+                        window.location.hash = 'browse'; // Use hash routing
+                    }, 1500);
+                } else {
+                    uploadStatus.textContent = 'Upload failed.';
+                    alert('Upload failed: ' + result.error);
+                }
             } else {
-                uploadStatus.textContent = 'Upload failed: ' + result.message;
-                alert('Upload failed: ' + result.message);
+                uploadStatus.textContent = 'Error uploading.';
+                alert('Error uploading file: ' + xhr.statusText);
             }
-        } catch (error) {
-            uploadStatus.textContent = 'Error: ' + error.message;
-            alert('Error uploading file: ' + error.message);
-        }
+        };
+
+        xhr.onerror = function() {
+            uploadStatus.textContent = 'Error uploading.';
+            alert('Error uploading file. Please try again.');
+        };
+
+        // Start the upload
+        xhr.send(formData);
     });
-
-    async function uploadModel(formData) {
-        try {
-            const response = await fetch(`${API_URL}/api/upload`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error uploading model:', error);
-            throw error;
-        }
-    }
-
-    async function fetchModels() {
-        try {
-            const response = await fetch(`${API_URL}/api/models`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching models:', error);
-            throw error;
-        }
-    }
 });

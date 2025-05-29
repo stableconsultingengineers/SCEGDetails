@@ -3,61 +3,896 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SCEG Details</title>
+<title>BIM Details - 3D Construction Details</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
+html {
+    overflow-x: hidden;
+    width: 100%;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    max-width: 800px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c5074 50%, #3d6a89 100%);
+    color: #333;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+}
+.header {
+    background: #fff;
+    padding: 1rem 0;
+    box-shadow: 0 2px 20px rgba(30, 58, 95, 0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+}
+.nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0 2rem;
+    box-sizing: border-box;
 }
-.upload-container {
-    border: 2px dashed #ccc;
-    padding: 20px;
-    text-align: center;
-    margin: 20px 0;
+.logo {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #1e3a5f;
 }
-.upload-container.dragover {
-    background-color: #e1e1e1;
-    border-color: #999;
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
 }
-#statusMessage {
-    margin-top: 10px;
+.nav-links a {
+    text-decoration: none;
+    color: #2c5074;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+.nav-links a:hover {
+    color: #1e3a5f;
+}
+.nav-links a.active {
+    color: #1e3a5f;
+    font-weight: bold;
+}
+.container {
+    width: 100%;
+    max-width: 100vw;
+    margin: 0 auto;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+.detail-header, .model-viewer, .model-info, .upload-section {
+    max-width: 100%;
+    overflow: hidden;
+}
+.detail-header {
+    background: #fff;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(30, 58, 95, 0.1);
+    border-top: 4px solid #1e3a5f;
+}
+.detail-title {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+.detail-code {
+    font-size: 1.2rem;
+    color: #1e3a5f;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+.viewer-container {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    width: 100%;
+    max-width: 100%;
+}
+.model-viewer {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(30, 58, 95, 0.1);
+    position: relative;
+    min-height: 400px;
+    height: calc(100vh - 300px);
+    max-height: 800px;
+    border-top: 4px solid #2c5074;
+}
+.viewer-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    min-width: 300px;
+    min-height: 300px;
+}
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #2c5074;
+    font-size: 1.2rem;
+}
+.controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+.control-btn {
+    background: #1e3a5f;
+    color: white;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+}
+.control-btn:hover {
+    background: #2c5074;
+}
+.model-info {
+    background: #fff;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(30, 58, 95, 0.1);
+    height: fit-content;
+    border-top: 4px solid #3d6a89;
+}
+.info-section {
+    margin-bottom: 1.5rem;
+}
+.info-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+.info-content {
     color: #666;
+    line-height: 1.6;
 }
+.upload-section {
+    background: #fff;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(30, 58, 95, 0.1);
+    border-top: 4px solid #2c5074;
+}
+.upload-zone {
+    border: 2px dashed #2c5074;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    background: #f5f5f5;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.upload-zone:hover {
+    background: #e0e0e0;
+    border-color: #1e3a5f;
+}
+.upload-zone.dragover {
+    background: #e0e0e0;
+    border-color: #1e3a5f;
+}
+.upload-icon {
+    font-size: 3rem;
+    color: #2c5074;
+    margin-bottom: 1rem;
+}
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+.detail-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 5px 20px rgba(30, 58, 95, 0.1);
+    transition: all 0.3s;
+    cursor: pointer;
+    border-top: 3px solid #3d6a89;
+}
+.detail-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(30, 58, 95, 0.15);
+    border-top-color: #1e3a5f;
+}
+.card-preview {
+    width: 100%;
+    height: 150px;
+    background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 2rem;
+}
+.hidden { display: none; }
+
+/* Breadcrumb Styles */
+.breadcrumb {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+.breadcrumb a {
+    color: #2c5074;
+    text-decoration: none;
+}
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+.breadcrumb span {
+    color: #666;
+    margin: 0 0.5rem;
+}
+
+/* Share Button Styles */
+.share-btn {
+    background: #3d6a89;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    margin-left: 0.5rem;
+}
+.share-btn:hover {
+    background: #2c5074;
+}
+
+/* Progress Bar Styles */
 .progress-bar {
     width: 100%;
     height: 20px;
     background-color: #f0f0f0;
     border-radius: 10px;
     overflow: hidden;
-    margin-top: 10px;
+    margin: 1rem 0;
 }
+
 .progress-fill {
     width: 0%;
     height: 100%;
-    background-color: #4CAF50;
-    transition: width 0.3s ease-in-out;
+    background-color: #2c5074;
+    transition: width 0.3s ease;
+}
+
+/* Responsive Design */
+@media (min-width: 1920px) {
+    .viewer-container {
+        grid-template-columns: 1fr 450px;
+    }
+    .model-viewer {
+        height: calc(100vh - 250px);
+        max-height: 1000px;
+    }
+    .details-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 400px));
+    }
+}
+
+@media (max-width: 1200px) {
+    .container { padding: 1.5rem; }
+    .nav { padding: 0 1.5rem; }
+    .viewer-container { gap: 1.5rem; }
+}
+
+@media (max-width: 768px) {
+    .viewer-container { 
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .model-viewer {
+        height: calc(100vh - 400px);
+        min-height: 300px;
+        max-height: 600px;
+    }
+    .nav-links { display: none; }
+    .container { padding: 1rem; }
+    .nav { padding: 0 1rem; }
+    .details-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container { padding: 0.5rem; }
+    .nav { padding: 0 0.5rem; }
+    .detail-header { padding: 1.5rem; margin: 0.5rem; }
+    .model-info { padding: 1.5rem; }
+    .upload-section { padding: 1.5rem; }
+    .details-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    .viewer-container { gap: 0.5rem; }
 }
 </style>
 </head>
 <body>
-    <h1>SCEG Details Upload</h1>
-    
-    <div class="upload-container" id="dropZone">
-        <form id="uploadForm">
-            <input type="file" id="fileInput" style="display: none;">
-            <button type="button" onclick="document.getElementById('fileInput').click()">Select File</button>
-            <p>or drag and drop files here</p>
-            <div id="selectedFile"></div>
-            <button type="submit">Upload</button>
-            </form>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div id="statusMessage"></div>
+<header class="header">
+<nav class="nav">
+    <div class="logo">
+        <a href="#home" style="text-decoration: none; color: inherit;">BIM Details</a>
     </div>
+    <ul class="nav-links">
+        <li><a href="#home" id="nav-home">Home</a></li>
+        <li><a href="#browse" id="nav-browse">Browse Details</a></li>
+        <li><a href="#upload" id="nav-upload">Upload</a></li>
+    </ul>
+</nav>
+</header>
+<div class="container">
+<!-- Home Page -->
+<div id="home-page">
+    <div class="detail-header">
+        <h1 class="detail-title">3D Construction Details Library</h1>
+        <p class="info-content">Professional BIM models and construction details for architects, engineers, and contractors. Access and share three-dimensional detailed models for enhanced project visualization.</p>
+    </div>
+</div>
+<!-- Browse Page -->
+<div id="browse-page" class="hidden">
+    <div class="detail-header">
+        <h1 class="detail-title">Browse All Details</h1>
+        <p class="info-content">Explore our comprehensive library of construction details organized by category</p>
+    </div>
+    <div class="details-grid"></div>
+</div>
+<!-- Upload Page -->
+<div id="upload-page" class="hidden">
+    <div class="detail-header">
+        <h1 class="detail-title">Upload Custom 3D Details</h1>
+        <p class="info-content">Upload your own 3D models to expand the details library. Supported formats: GLB, OBJ, FBX</p>
+    </div>
+    <div class="upload-section">
+        <div class="upload-zone" id="upload-zone">
+            <div class="upload-icon">📤</div>
+            <h3>Drop 3D models here or click to browse</h3>
+            <p>Supported formats: .glb, .obj, .fbx (Max size: 50MB)</p>
+            <input type="file" id="file-input" style="display: none;" accept=".glb,.obj,.fbx" multiple>
+        </div>
+        <div id="file-preview" class="hidden" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #2c5074;">Selected File</h4>
+            <div id="selected-file-info" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: white; border-radius: 6px; border: 1px solid #e9ecef;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.2rem;">📁</span>
+                    <span id="file-name" style="color: #2c5074;"></span>
+                </div>
+                <button id="remove-file" style="background: none; border: none; color: #dc3545; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 1.2rem;">✕</button>
+            </div>
+        </div>
+        <div id="upload-progress" class="hidden" style="margin: 1rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+            <div class="progress-bar" style="width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden; margin-bottom: 0.5rem;">
+                <div class="progress-fill" id="progress-fill" style="width: 0%; height: 100%; background-color: #2c5074; transition: width 0.3s ease;"></div>
+            </div>
+            <p id="upload-status" style="margin: 0; color: #2c5074; font-weight: 500;">Uploading...</p>
+        </div>
+        <div id="upload-form" class="hidden" style="margin-top: 2rem;">
+            <h3>Model Information</h3>
+            <form id="model-form" style="display: grid; gap: 1rem; margin-top: 1rem;">
+                <input type="text" placeholder="Detail Code (e.g., CU-001)" required style="padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px;">
+                <input type="text" placeholder="Title" required style="padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px;">
+                <select required style="padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="">Select Category</option>
+                    <option value="structural">Structural</option>
+                    <option value="civil">Civil</option>
+                    <option value="architectual">Architectural</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <textarea placeholder="Description" rows="4" style="padding: 0.8rem; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                <button type="submit" class="btn">Upload Model</button>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Detail Viewer Page -->
+<div id="detail-page" class="hidden">
+    <div class="breadcrumb">
+        <a href="#home">Home</a> <span>></span> 
+        <a href="#browse">Browse</a> <span>></span> 
+        <span id="breadcrumb-detail">Detail</span>
+    </div>
+    <div class="detail-header">
+        <div class="detail-code" id="detail-code"></div>
+        <h1 class="detail-title" id="detail-title">
+            <span id="detail-title-text"></span>
+            <button class="share-btn" onclick="shareDetail()">📋 Share Link</button>
+        </h1>
+    </div>
+    <div class="viewer-container">
+        <div class="model-viewer">
+            <div id="loading" class="loading">Loading 3D Model...</div>
+            <canvas id="viewer-canvas" class="viewer-canvas hidden"></canvas>
+            <div class="controls">
+                <button class="control-btn" onclick="resetCamera()">Reset View</button>
+                <button class="control-btn" onclick="toggleWireframe()">Wireframe</button>
+                <button class="control-btn" onclick="toggleFullscreen()">Fullscreen</button>
+            </div>
+        </div>
+        <div class="model-info">
+            <div class="info-section">
+                <div class="info-title">Description</div>
+                <div class="info-content" id="detail-description"></div>
+            </div>
+            <div class="info-section">
+                <div class="info-title">Materials</div>
+                <div class="info-content" id="detail-materials"></div>
+            </div>
+            <div class="info-section">
+                <div class="info-title">Specifications</div>
+                <div class="info-content" id="detail-specs"></div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<script>
+let scene, camera, renderer, model, controls;
+let isWireframe = false;
+let modelBoundingRadius = 2.5; // Default fallback
+let originalMaterials = new Map(); // Store original materials for wireframe toggle
+let modelsCache = []; // Cache for loaded models
 
-    <script src="assets/js/upload.js"></script>
+// ===== URL ROUTING SYSTEM =====
+function initRouting() {
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleRouteChange);
+    
+    // Handle initial route on page load
+    handleRouteChange();
+}
+
+function handleRouteChange() {
+    const hash = window.location.hash.slice(1); // Remove the # symbol
+    const [route, ...params] = hash.split('/');
+    
+    // Update active navigation
+    updateActiveNav(route);
+    
+    switch (route) {
+        case 'browse':
+            showBrowse();
+            break;
+        case 'upload':
+            showUpload();
+            break;
+        case 'detail':
+            if (params[0]) {
+                showDetailById(params[0]);
+            } else {
+                showHome(); // Fallback if no ID provided
+            }
+            break;
+        case 'home':
+        case '':
+        default:
+            showHome();
+            break;
+    }
+}
+
+function updateActiveNav(currentRoute) {
+    // Remove active class from all nav links
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to current route
+    const activeLink = document.getElementById(`nav-${currentRoute || 'home'}`);
+    if (activeLink) {
+        activeLink.classList.add('active');
+    }
+}
+
+function navigateTo(route) {
+    window.location.hash = route;
+}
+
+function shareDetail() {
+    const currentUrl = window.location.href;
+    navigator.clipboard.writeText(currentUrl).then(() => {
+        alert('Link copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = currentUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Link copied to clipboard!');
+    });
+}
+
+// ===== UPDATED NAVIGATION FUNCTIONS =====
+function showHome() {
+    hideAllPages();
+    document.getElementById('home-page').classList.remove('hidden');
+    document.title = 'BIM Details - 3D Construction Details';
+}
+
+function showBrowse() {
+    hideAllPages();
+    document.getElementById('browse-page').classList.remove('hidden');
+    document.title = 'Browse Details - BIM Details';
+    loadModels();
+}
+
+function showUpload() {
+    hideAllPages();
+    document.getElementById('upload-page').classList.remove('hidden');
+    document.title = 'Upload Model - BIM Details';
+}
+
+function showDetail(model) {
+    // Update URL with model ID
+    if (model && (model.id || model._id)) {
+        const modelId = model.id || model._id;
+        navigateTo(`detail/${modelId}`);
+        return; // Let the route handler take over
+    }
+    
+    // Direct show without URL change (fallback)
+    showDetailDirect(model);
+}
+
+function showDetailById(modelId) {
+    // Try to find model in cache first
+    const cachedModel = modelsCache.find(m => (m.id || m._id) === modelId);
+    if (cachedModel) {
+        showDetailDirect(cachedModel);
+        return;
+    }
+    
+    // If not in cache, try to fetch from API
+    fetch(`/api/models/${modelId}`)
+        .then(response => response.json())
+        .then(model => {
+            if (model) {
+                showDetailDirect(model);
+            } else {
+                alert('Model not found');
+                navigateTo('browse');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading model:', error);
+            alert('Error loading model');
+            navigateTo('browse');
+        });
+}
+
+function showDetailDirect(model) {
+    hideAllPages();
+    document.getElementById('detail-page').classList.remove('hidden');
+    
+    // Show loading state immediately
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('viewer-canvas').classList.add('hidden');
+    
+    if (typeof model === 'object' && model !== null) {
+        const modelName = model.name || model.title || 'Unknown Model';
+        const modelCode = model.code || model.id || model._id || '';
+        
+        document.getElementById('detail-code').textContent = modelCode;
+        document.getElementById('detail-title-text').textContent = modelName;
+        document.getElementById('breadcrumb-detail').textContent = modelName;
+        document.getElementById('detail-description').textContent = model.description || '';
+        document.getElementById('detail-materials').innerHTML = (model.materials && model.materials.length) ? model.materials.join('<br>') : '';
+        document.getElementById('detail-specs').innerHTML = (model.specifications && model.specifications.length) ? model.specifications.join('<br>') : '';
+        
+        // Update page title
+        document.title = `${modelName} - BIM Details`;
+        
+        // Wait for DOM to be fully rendered before initializing 3D viewer
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                // Initialize 3D viewer if not already done
+                if (!renderer) {
+                    init3DViewer();
+                } else {
+                    // Clear existing scene
+                    clearScene();
+                    // Ensure proper canvas sizing after page switch
+                    resizeRenderer();
+                }
+                
+                // Load the model after viewer is ready
+                if (model.filePath) {
+                    load3DModel(model.filePath);
+                }
+            });
+        });
+    }
+}
+
+function hideAllPages() {
+    document.getElementById('home-page').classList.add('hidden');
+    document.getElementById('detail-page').classList.add('hidden');
+    document.getElementById('upload-page').classList.add('hidden');
+    document.getElementById('browse-page').classList.add('hidden');
+}
+
+async function loadModels() {
+    try {
+        const response = await fetch('/api/models');
+        const models = await response.json();
+        modelsCache = models; // Cache the models for routing
+        
+        const grid = document.querySelector('#browse-page .details-grid');
+        grid.innerHTML = '';
+        models.forEach(model => {
+            const modelId = model.id || model._id;
+            const card = document.createElement('div');
+            card.className = 'detail-card';
+            card.innerHTML = `
+                <div class="card-preview">🏗️</div>
+                <h3>${model.name}</h3>
+                <p>${model.description}</p>
+                <small>${model.category} • Uploaded ${new Date(model.uploadDate).toLocaleDateString()}</small>
+            `;
+            card.onclick = () => navigateTo(`detail/${modelId}`);
+            grid.appendChild(card);
+        });
+    } catch (error) {
+        console.error('Error loading models:', error);
+    }
+}
+
+// ===== 3D VIEWER FUNCTIONS (unchanged) =====
+function init3DViewer() {
+    const canvas = document.getElementById('viewer-canvas');
+    const container = document.querySelector('.model-viewer');
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf5f5f5);
+
+    // Get proper canvas dimensions from container
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || 500;
+    const height = rect.height || 400;
+    const aspect = width / height;
+
+    // Camera setup
+    camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+    camera.position.set(5, 5, 5);
+
+    // Renderer setup
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(width, height, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    // Add OrbitControls
+    controls = new THREE.OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 1;
+    controls.maxDistance = 50;
+    controls.maxPolarAngle = Math.PI;
+
+    animate();
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    if (controls) controls.update();
+    if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+    }
+}
+
+function clearScene() {
+    if (scene) {
+        while(scene.children.length > 0) {
+            const object = scene.children[0];
+            scene.remove(object);
+            if (object.geometry) object.geometry.dispose();
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(mat => mat.dispose());
+                } else {
+                    object.material.dispose();
+                }
+            }
+        }
+    }
+    originalMaterials.clear();
+    model = null;
+}
+
+function load3DModel(filePath) {
+    const canvas = document.getElementById('viewer-canvas');
+    
+    clearScene();
+    
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+    scene.add(ambientLight);
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(10, 10, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+    
+    const fillLight = new THREE.DirectionalLight(0x404040, 0.5);
+    fillLight.position.set(-10, -10, -5);
+    scene.add(fillLight);
+
+    const loader = new THREE.GLTFLoader();
+    loader.load(filePath, function(gltf) {
+        model = gltf.scene;
+
+        model.traverse((child) => {
+            if (child.isMesh && child.material) {
+                originalMaterials.set(child.uuid, child.material.clone());
+                if (child.material.map) {
+                    child.material.map.encoding = THREE.sRGBEncoding;
+                }
+                child.material.needsUpdate = true;
+            }
+        });
+
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+
+        model.position.x -= center.x;
+        model.position.y -= center.y;
+        model.position.z -= center.z;
+
+        const scale = 5 / size;
+        model.scale.setScalar(scale);
+
+        scene.add(model);
+
+        const sphere = new THREE.Sphere();
+        box.setFromObject(model);
+        box.getBoundingSphere(sphere);
+        modelBoundingRadius = sphere.radius;
+
+        const camDist = modelBoundingRadius * 2.5;
+        camera.position.set(camDist * 0.7, camDist * 0.7, camDist * 0.7);
+        camera.lookAt(0, 0, 0);
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        document.getElementById('loading').classList.add('hidden');
+        canvas.classList.remove('hidden');
+        
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                resizeRenderer();
+                if (renderer && scene && camera) {
+                    renderer.render(scene, camera);
+                }
+            });
+        });
+        
+    }, undefined, function(error) {
+        console.error('Error loading 3D model:', error);
+        document.getElementById('loading').textContent = 'Failed to load 3D model.';
+    });
+}
+
+function resizeRenderer() {
+    const canvas = document.getElementById('viewer-canvas');
+    const container = document.querySelector('.model-viewer');
+    if (renderer && camera && canvas && container) {
+        const rect = container.getBoundingClientRect();
+        const width = rect.width || canvas.clientWidth || 500;
+        const height = rect.height || canvas.clientHeight || 400;
+        
+        if (width > 10 && height > 10) {
+            renderer.setSize(width, height, false);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            
+            if (scene) {
+                renderer.render(scene, camera);
+            }
+        }
+    }
+}
+
+function resetCamera() {
+    if (!model) return;
+    const camDist = modelBoundingRadius * 2.5;
+    camera.position.set(camDist * 0.7, camDist * 0.7, camDist * 0.7);
+    controls.target.set(0, 0, 0);
+    controls.update();
+}
+
+function toggleWireframe() {
+    isWireframe = !isWireframe;
+    if (model) {
+        model.traverse((child) => {
+            if (child.isMesh) {
+                if (isWireframe) {
+                    child.material.wireframe = true;
+                } else {
+                    const original = originalMaterials.get(child.uuid);
+                    if (original) {
+                        child.material = original.clone();
+                        child.material.needsUpdate = true;
+                    } else {
+                        child.material.wireframe = false;
+                    }
+                }
+            }
+        });
+    }
+}
+
+function toggleFullscreen() {
+    const canvas = document.getElementById('viewer-canvas');
+    if (canvas.requestFullscreen) {
+        canvas.requestFullscreen();
+    }
+}
+
+// Handle window resize with throttling for better performance
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        resizeRenderer();
+    }, 100);
+});
+
+// Handle fullscreen changes
+document.addEventListener('fullscreenchange', () => {
+    setTimeout(() => {
+        resizeRenderer();
+    }, 100);
+});
+
+// Initialize routing when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    initRouting();
+});
+</script>
+<script src="/assets/js/upload.js"></script>
 </body>
 </html>
