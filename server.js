@@ -12,7 +12,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'DELETE'],
     allowedHeaders: ['Content-Type']
 }));
 app.use(express.json());
@@ -330,6 +330,102 @@ app.get('/api/models/:id', async (req, res) => {
         } else {
             res.status(500).json({ error: error.message });
         }
+    }
+});
+
+// ===== DELETE ROUTES =====
+
+// Delete a model and its file
+app.delete('/api/models/:id', async (req, res) => {
+    console.log('\n=== DELETE MODEL REQUEST ===');
+    console.log('Model ID:', req.params.id);
+    
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            console.log('❌ MongoDB not connected');
+            return res.status(500).json({ error: 'Database not connected' });
+        }
+
+        // Find the model first to get file path
+        const model = await Model.findById(req.params.id);
+        
+        if (!model) {
+            console.log('❌ Model not found');
+            return res.status(404).json({ error: 'Model not found' });
+        }
+
+        console.log('✅ Model found:', model.name);
+        console.log('File path:', model.filePath);
+
+        // Delete file from filesystem
+        const fileName = path.basename(model.filePath);
+        const filePath = path.join(__dirname, 'uploads', fileName);
+        
+        console.log('Attempting to delete file:', filePath);
+        
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log('✅ File deleted from filesystem');
+        } else {
+            console.log('⚠️ File not found on filesystem (already deleted?)');
+        }
+
+        // Delete model from database
+        await Model.findByIdAndDelete(req.params.id);
+        console.log('✅ Model deleted from database');
+
+        res.json({ 
+            success: true, 
+            message: 'Model and file deleted successfully',
+            deletedModel: {
+                id: model._id,
+                name: model.name,
+                filePath: model.filePath
+            }
+        });
+
+        console.log('=== DELETE MODEL SUCCESS ===\n');
+
+    } catch (error) {
+        console.error('❌ Delete error:', error);
+        if (error.name === 'CastError') {
+            res.status(400).json({ error: 'Invalid model ID' });
+        } else {
+            res.status(500).json({ error: error.message });
+        }
+        console.log('=== DELETE MODEL FAILED ===\n');
+    }
+});
+
+// Delete just a file (without database record)
+app.delete('/api/files/:filename', (req, res) => {
+    console.log('\n=== DELETE FILE REQUEST ===');
+    console.log('Filename:', req.params.filename);
+    
+    try {
+        const filePath = path.join(__dirname, 'uploads', req.params.filename);
+        console.log('File path:', filePath);
+        
+        if (!fs.existsSync(filePath)) {
+            console.log('❌ File not found');
+            return res.status(404).json({ error: 'File not found' });
+        }
+        
+        fs.unlinkSync(filePath);
+        console.log('✅ File deleted successfully');
+        
+        res.json({ 
+            success: true, 
+            message: 'File deleted successfully',
+            filename: req.params.filename
+        });
+
+        console.log('=== DELETE FILE SUCCESS ===\n');
+        
+    } catch (error) {
+        console.error('❌ File delete error:', error);
+        res.status(500).json({ error: error.message });
+        console.log('=== DELETE FILE FAILED ===\n');
     }
 });
 
