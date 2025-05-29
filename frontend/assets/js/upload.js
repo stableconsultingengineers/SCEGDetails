@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeFileBtn = document.getElementById('remove-file');
     let selectedFile = null;
 
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
     // Show file dialog on click
     uploadZone.addEventListener('click', () => {
         fileInput.click();
@@ -102,9 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         const inputs = uploadForm.querySelectorAll('input, select, textarea');
         
-        // Get the base URL from the current window location
-        const baseUrl = window.location.origin;
-        
         formData.append('file', selectedFile);
         formData.append('name', inputs[1].value); // Title
         formData.append('category', inputs[2].value); // Category
@@ -113,14 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('specifications', 'default'); // Default specification
 
         try {
-            const response = await fetch(`${baseUrl}/api/upload`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
+            const result = await uploadModel(formData);
             
-            if (response.ok) {
+            if (result.success) {
                 progressFill.style.width = '100%';
                 uploadStatus.textContent = 'File uploaded successfully!';
                 alert('Model uploaded successfully! Your model is now available in the library.');
@@ -141,4 +135,37 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Error uploading file: ' + error.message);
         }
     });
+
+    async function uploadModel(formData) {
+        try {
+            const response = await fetch(`${API_URL}/api/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error uploading model:', error);
+            throw error;
+        }
+    }
+
+    async function fetchModels() {
+        try {
+            const response = await fetch(`${API_URL}/api/models`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error fetching models:', error);
+            throw error;
+        }
+    }
 });
