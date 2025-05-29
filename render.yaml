@@ -10,6 +10,8 @@ services:
         sync: false
       - key: PORT
         value: 3000
+      - key: FRONTEND_URL
+        value: https://stableconsultingengineers.github.io/SCEGDetails
 
   - type: static
     name: sceg-details-frontend

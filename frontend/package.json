@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "description": "Frontend for SCEG Details application",
   "main": "index.html",
+  "homepage": "https://stableconsultingengineers.github.io/SCEGDetails",
   "scripts": {
-    "start": "serve ."
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "serve": "^14.2.1"
