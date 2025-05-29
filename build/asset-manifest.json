@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/SCEGDetails/static/css/main.ca57846c.css",
+    "main.js": "/SCEGDetails/static/js/main.4ea5aa27.js",
+    "index.html": "/SCEGDetails/index.html",
+    "main.ca57846c.css.map": "/SCEGDetails/static/css/main.ca57846c.css.map",
+    "main.4ea5aa27.js.map": "/SCEGDetails/static/js/main.4ea5aa27.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.ca57846c.css",
+    "static/js/main.4ea5aa27.js"
+  ]
+}
